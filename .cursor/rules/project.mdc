@@ -1,0 +1,12 @@
+---
+description: Stillpoint MVP rules
+alwaysApply: true
+---
+- Read docs/PRD.md before each task and build only what it describes.
+- Stack: React, TypeScript strict, Vite, Tailwind, uPlot, Zustand, Dexie.
+- Colours and type come only from src/styles/tokens.css (PRD section 5). Dark theme only.
+- Serial access only through src/device. Components never touch the port.
+- Device limits and timings live in src/device/device.config.ts.
+- Pressure is labelled "rel." until calibration. Never label it mmHg.
+- Raw samples are stored and exported unchanged.
+- No em dashes in any UI text.

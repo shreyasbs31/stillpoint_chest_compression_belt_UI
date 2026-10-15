@@ -1,0 +1,29 @@
+/* Stillpoint colour and type tokens. Components read these variables only. */
+
+:root {
+  color-scheme: dark;
+  --bg: #070d18;
+  --surface: #0e1726;
+  --surface-raised: #142034;
+  --border: #1f2d44;
+  --border-strong: #2b3d5a;
+  --text: #e7eef8;
+  --text-muted: #8ea0ba;
+  --text-faint: #5e7190;
+  --primary: #2dd4bf;
+  --primary-hover: #14b8a6;
+  --wave: #5eead4;
+  --wave-fill: color-mix(in srgb, #5eead4 12%, transparent);
+  --pressure: #7dd3fc;
+  --ok: #34d399;
+  --warn: #fbbf24;
+  --danger: #f87171;
+  --danger-solid: #dc2626;
+  --idle: #64748b;
+  --inflate-band: color-mix(in srgb, #fbbf24 16%, transparent);
+  --hold-band: color-mix(in srgb, #34d399 16%, transparent);
+  --deflate-band: color-mix(in srgb, #7dd3fc 16%, transparent);
+  --shadow: 0 24px 48px rgba(0, 0, 0, 0.45);
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
