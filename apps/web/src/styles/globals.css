@@ -133,10 +133,30 @@ button:disabled {
   gap: 12px;
   padding: 12px;
   grid-template-columns: minmax(0, 1fr) 380px;
-  grid-template-rows: minmax(280px, 1.55fr) minmax(168px, 0.7fr);
-  grid-template-areas:
-    'wave side'
-    'pressure side';
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-areas: 'pressure side';
+}
+
+/* uPlot draws the trace on a canvas and the axes on separate layers.
+   Without absolute positioning those layers stack in normal flow and the
+   canvas is pushed below the panel. */
+.chart-host {
+  overflow: hidden;
+}
+
+.chart-host .u-under,
+.chart-host .u-over,
+.chart-host .u-axis {
+  position: absolute;
+}
+
+.chart-host .u-wrap {
+  position: relative;
+}
+
+.chart-host .uplot {
+  width: min-content;
+  line-height: 1.5;
 }
 
 @media (max-width: 1440px) {

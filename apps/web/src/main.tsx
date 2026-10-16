@@ -8,6 +8,7 @@ import '@fontsource/jetbrains-mono/500.css';
 import { App } from './App';
 import { useDevice } from './device/useDevice';
 import './styles/globals.css';
+import 'uplot/dist/uPlot.min.css';
 
 if (import.meta.env.DEV) {
   void import('./device/preview').then(({ seedPreview }) => {

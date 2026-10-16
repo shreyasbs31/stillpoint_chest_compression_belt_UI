@@ -82,11 +82,11 @@ export function LivePage() {
       </header>
 
       <div className="live-stage">
-        <section className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-surface" style={{ gridArea: 'wave' }}>
+        <section className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-surface" style={{ gridArea: 'pressure' }}>
           <PanelTitle
-            title="Breathing"
+            title="Belt pressure"
             value={pressureNow}
-            color="var(--wave)"
+            color="var(--pressure)"
             extra={
               <div className="flex rounded-lg border border-border p-0.5">
                 {([30, 60] as const).map((sec) => (
@@ -97,10 +97,10 @@ export function LivePage() {
               </div>
             }
           />
-          <div className="relative min-h-[280px] flex-1">
-            <StreamChart kind="breathing" windowSec={chartWindow} markers={markers} />
+          <div className="relative min-h-0 flex-1">
+            <StreamChart windowSec={chartWindow} markers={markers} />
             {status !== 'connected' ? (
-              <div className="absolute inset-0 grid place-items-center bg-surface/80 p-6">
+              <div className="absolute inset-0 z-10 grid place-items-center bg-surface/80 p-6">
                 <div className="w-[min(360px,100%)] rounded-xl border border-border bg-surface-raised p-5">
                   {status === 'starting' ? (
                     <p className="text-[14px] text-muted">Starting</p>
@@ -114,13 +114,6 @@ export function LivePage() {
                 </div>
               </div>
             ) : null}
-          </div>
-        </section>
-
-        <section className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-surface" style={{ gridArea: 'pressure' }}>
-          <PanelTitle title="Belt pressure" value={pressureNow} color="var(--pressure)" />
-          <div className="relative min-h-[140px] flex-1">
-            <StreamChart kind="pressure" windowSec={chartWindow} markers={markers} />
           </div>
         </section>
 
@@ -181,10 +174,10 @@ function formatRel(value: number) {
 
 function PanelTitle({ title, value, color, extra }: { title: string; value: number | null; color: string; extra?: React.ReactNode }) {
   return (
-    <header className="flex h-11 shrink-0 items-center gap-3 border-b border-border px-3">
-      <h2 className="text-[16px] leading-6 font-semibold">{title}</h2>
-      {extra}
-      <p className="ml-auto text-[20px] leading-6 font-semibold tabular" style={{ color }}>
+    <header className="flex h-11 shrink-0 items-center gap-2 overflow-hidden border-b border-border px-3">
+      <h2 className="min-w-0 truncate text-[16px] leading-6 font-semibold whitespace-nowrap">{title}</h2>
+      <div className="shrink-0">{extra}</div>
+      <p className="ml-auto shrink-0 text-[20px] leading-6 font-semibold tabular" style={{ color }}>
         {value == null ? <span className="text-faint"> </span> : (
           <>
             {formatRel(value)}

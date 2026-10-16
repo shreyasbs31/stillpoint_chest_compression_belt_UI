@@ -10,11 +10,9 @@ function token(name: string) {
 }
 
 export function StreamChart({
-  kind,
   windowSec,
   markers,
 }: {
-  kind: 'breathing' | 'pressure';
   windowSec: number;
   markers: LiveMarker[];
 }) {
@@ -27,18 +25,26 @@ export function StreamChart({
   useEffect(() => {
     const el = host.current;
     if (!el) return;
-    const color = kind === 'breathing' ? token('--wave') : token('--pressure');
+    const color = token('--pressure');
     let states: DeviceState[] = [];
     let frame = 0;
 
+    const size = () => {
+      const rect = el.getBoundingClientRect();
+      return {
+        width: Math.max(Math.round(rect.width), 32),
+        height: Math.max(Math.round(rect.height), 32),
+      };
+    };
+
     const chart = new uPlot(
       {
-        width: Math.max(el.clientWidth, 32),
-        height: Math.max(el.clientHeight, 32),
+        width: size().width,
+        height: size().height,
         pxAlign: false,
         cursor: { show: false },
         legend: { show: false },
-        padding: [8, 12, 0, 0],
+        padding: [16, 16, 0, 8],
         scales: {
           x: { time: false },
           y: {
@@ -59,7 +65,7 @@ export function StreamChart({
             grid: { stroke: token('--border'), width: 1 },
             ticks: { stroke: token('--border'), width: 1, size: 4 },
             font: '500 11px Inter',
-            size: 24,
+            size: 28,
             values: (_u, vals) => vals.map((value) => (value >= -0.05 ? 'now' : `${Math.round(-value)}s`)),
           },
           {
@@ -67,15 +73,15 @@ export function StreamChart({
             grid: { stroke: token('--border'), width: 1 },
             ticks: { stroke: token('--border'), width: 1, size: 4 },
             font: '500 11px Inter',
-            size: 56,
+            size: 64,
             values: (_u, vals) => vals.map((value) => formatTick(value)),
           },
         ],
-        series: [{}, { stroke: color, width: kind === 'breathing' ? 2 : 1.5 }],
+        series: [{}, { stroke: color, width: 2 }],
         hooks: {
           drawClear: [
             (u) => {
-              if (kind === 'pressure') drawBands(u, states);
+              drawBands(u, states);
             },
           ],
           draw: [
@@ -122,22 +128,24 @@ export function StreamChart({
     };
     frame = requestAnimationFrame(draw);
 
-    const observer = new ResizeObserver(() => {
-      const width = el.clientWidth;
-      const height = el.clientHeight;
-      if (width < 16 || height < 16) return;
-      chart.setSize({ width, height });
-    });
+    const fit = () => {
+      const next = size();
+      if (next.width < 16 || next.height < 16) return;
+      if (next.width === chart.width && next.height === chart.height) return;
+      chart.setSize(next);
+    };
+    const observer = new ResizeObserver(() => fit());
     observer.observe(el);
+    fit();
 
     return () => {
       cancelAnimationFrame(frame);
       observer.disconnect();
       chart.destroy();
     };
-  }, [kind, windowSec]);
+  }, [windowSec]);
 
-  return <div ref={host} className="absolute inset-0" />;
+  return <div ref={host} className="chart-host absolute inset-0" />;
 }
 
 function formatTick(value: number) {
