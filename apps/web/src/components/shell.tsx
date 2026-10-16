@@ -18,7 +18,6 @@ export function Shell() {
   const lock = useAuth((s) => s.lock);
   const status = useDevice((s) => s.status);
   const recording = useDevice((s) => s.recording);
-  const confirmed = useDevice((s) => s.emptyConfirmed);
   const connect = useDevice((s) => s.connect);
   const disconnect = useDevice((s) => s.disconnect);
   const alert = useDevice((s) => topAlert(s.alerts));
@@ -55,7 +54,7 @@ export function Shell() {
           {status === 'connected' || status === 'starting' ? (
             <Button variant="secondary" onClick={() => void disconnect()}>Disconnect</Button>
           ) : (
-            <Button variant="secondary" disabled={!onLive || !confirmed} title={confirmed ? 'Connect' : 'Confirm the bladder is empty on the live screen'} onClick={() => void connect()}>
+            <Button variant="secondary" disabled={!onLive} title={onLive ? 'Connect' : 'Open a live session to connect'} onClick={() => void connect()}>
               Connect
             </Button>
           )}
@@ -89,8 +88,8 @@ export function Shell() {
           </button>
         </div>
       ) : null}
-      <main className="relative min-h-0 flex-1">
-        <div className="absolute inset-0 overflow-auto">
+      <main className="flex min-h-0 flex-1 flex-col">
+        <div className="min-h-0 flex-1 overflow-auto">
           <Outlet />
         </div>
       </main>

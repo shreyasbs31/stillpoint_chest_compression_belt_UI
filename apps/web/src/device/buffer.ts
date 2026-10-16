@@ -8,26 +8,34 @@ export interface LivePoint {
   state: DeviceState;
 }
 
-const points: LivePoint[] = [];
-const listeners = new Set<() => void>();
+type Shared = {
+  points: LivePoint[];
+  listeners: Set<() => void>;
+};
+
+const root = globalThis as typeof globalThis & { __stillpointLive?: Shared };
+if (!root.__stillpointLive) {
+  root.__stillpointLive = { points: [], listeners: new Set() };
+}
+const store = root.__stillpointLive;
 
 export function pushPoint(point: LivePoint) {
-  points.push(point);
+  store.points.push(point);
   const cutoff = point.t - deviceConfig.liveWindowMs;
-  while (points.length && points[0].t < cutoff) points.shift();
-  listeners.forEach((listener) => listener());
+  while (store.points.length && store.points[0].t < cutoff) store.points.shift();
+  store.listeners.forEach((listener) => listener());
 }
 
 export function getPoints() {
-  return points;
+  return store.points;
 }
 
 export function clearPoints() {
-  points.length = 0;
-  listeners.forEach((listener) => listener());
+  store.points.length = 0;
+  store.listeners.forEach((listener) => listener());
 }
 
 export function subscribePoints(listener: () => void) {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
+  store.listeners.add(listener);
+  return () => store.listeners.delete(listener);
 }

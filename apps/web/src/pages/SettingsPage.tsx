@@ -1,22 +1,11 @@
 import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { useAuth } from '@/auth/auth';
-import { Button, Field, inputClass } from '@/components/ui';
+import { Button, inputClass } from '@/components/ui';
 import { allCsv, saveFile } from '@/data/download';
 import { useDevice } from '@/device/useDevice';
 import { useSettings } from '@/settings';
 import { toast } from '@/app/toasts';
 
-const schema = z.object({
-  current: z.string().min(1, 'Enter the current password'),
-  next: z.string().min(8, 'Use at least 8 characters.'),
-  confirm: z.string(),
-}).refine((values) => values.next === values.confirm, { message: 'Passwords do not match.', path: ['confirm'] });
-
 export function SettingsPage() {
-  const changePassword = useAuth((s) => s.changePassword);
   const chartWindow = useSettings((s) => s.chartWindow);
   const sound = useSettings((s) => s.sound);
   const setChartWindow = useSettings((s) => s.setChartWindow);
@@ -29,7 +18,6 @@ export function SettingsPage() {
   const lineRateHz = useDevice((s) => s.lineRateHz);
   const [openLog, setOpenLog] = useState(false);
   const [storage, setStorage] = useState('Calculating');
-  const form = useForm({ resolver: zodResolver(schema), defaultValues: { current: '', next: '', confirm: '' } });
 
   useEffect(() => {
     void navigator.storage?.estimate().then((estimate) => {
@@ -43,32 +31,7 @@ export function SettingsPage() {
       <h1 className="text-[24px] leading-8 font-semibold">Settings</h1>
 
       <Section title="Password">
-        <form
-          className="grid max-w-md gap-1"
-          onSubmit={form.handleSubmit(async (values) => {
-            const ok = await changePassword(values.current, values.next);
-            if (!ok) {
-              form.setError('current', { message: 'Incorrect password' });
-              return;
-            }
-            form.reset();
-            toast('Password changed.');
-          })}
-        >
-          <Field label="Current password" error={form.formState.errors.current?.message}>
-            <input type="password" className={inputClass} {...form.register('current')} />
-          </Field>
-          <Field label="New password" error={form.formState.errors.next?.message}>
-            <input type="password" className={inputClass} {...form.register('next')} />
-          </Field>
-          <Field label="Confirm password" error={form.formState.errors.confirm?.message}>
-            <input type="password" className={inputClass} {...form.register('confirm')} />
-          </Field>
-          <div className="mt-2">
-            <Button type="submit">Change password</Button>
-          </div>
-          <p className="mt-3 text-[12px] leading-4 text-muted">If this password is lost, the data on this laptop cannot be unlocked.</p>
-        </form>
+        <p className="text-[14px] leading-5 text-muted">The password is fixed and cannot be changed.</p>
       </Section>
 
       <Section title="Display">

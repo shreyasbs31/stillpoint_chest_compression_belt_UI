@@ -4,7 +4,7 @@ import { db, deleteSessionCascade } from '@/data/db';
 import { saveFile, sessionCsv } from '@/data/download';
 import { formatClock, formatWhen } from '@/data/ids';
 import type { Marker, Patient, Sample, Session } from '@/data/types';
-import { processSeries } from '@/processing/breathing';
+import { processSeries, summarize } from '@/processing/breathing';
 import { ReviewDetail, ReviewOverview } from '@/components/charts/ReviewChart';
 import { Button, Modal, buttonClass } from '@/components/ui';
 
@@ -29,6 +29,10 @@ export function ReviewPage() {
       setPatient(owner ?? null);
       const rows = await db.samples.where('sessionId').equals(next.id).sortBy('seq');
       setSamples(rows);
+      if (rows.length) {
+        const fresh = processSeries(rows.map((sample) => ({ t: sample.t, pressureRaw: sample.pressureRaw, state: sample.state })));
+        void db.sessions.update(next.id, { summary: summarize(fresh.samples, fresh.breaths) });
+      }
       setMarkers(await db.markers.where('sessionId').equals(next.id).toArray());
       setStart(rows[0] ? rows[0].t / 1000 : 0);
     })();
@@ -42,10 +46,11 @@ export function ReviewPage() {
     return () => window.clearTimeout(timer);
   }, [notes, session]);
 
-  const processed = useMemo(
-    () => processSeries(samples.map((sample) => ({ t: sample.t, pressureRaw: sample.pressureRaw, state: sample.state }))).samples,
+  const series = useMemo(
+    () => processSeries(samples.map((sample) => ({ t: sample.t, pressureRaw: sample.pressureRaw, state: sample.state }))),
     [samples],
   );
+  const processed = series.samples;
   const origin = processed[0]?.t ? processed[0].t / 1000 : 0;
   const duration = session?.durationS ?? (processed.length > 1 ? (processed[processed.length - 1].t - processed[0].t) / 1000 : 0);
   const windowS = Math.min(60, Math.max(duration, 1));
@@ -53,7 +58,7 @@ export function ReviewPage() {
   if (session === undefined) return null;
   if (!session || !patient) return <p className="px-6 py-6 text-muted">This session is not on this laptop.</p>;
 
-  const summary = session.summary;
+  const summary = samples.length ? summarize(series.samples, series.breaths) : session.summary;
 
   return (
     <div className="mx-auto w-full max-w-[1440px] px-6 py-6">

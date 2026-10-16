@@ -4,50 +4,6 @@ import { Logo } from '@/components/Logo';
 import { Button, inputClass } from '@/components/ui';
 import { useAuth } from '@/auth/auth';
 
-export function SetupPage() {
-  const navigate = useNavigate();
-  const ready = useAuth((s) => s.ready);
-  const hasPassword = useAuth((s) => s.hasPassword);
-  const setup = useAuth((s) => s.setup);
-  const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (!ready) void useAuth.getState().load();
-  }, [ready]);
-
-  if (ready && hasPassword) return <Navigate to="/login" replace />;
-
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (password.length < 8) {
-      setError('Use at least 8 characters.');
-      return;
-    }
-    if (password !== confirm) {
-      setError('Passwords do not match.');
-      return;
-    }
-    await setup(password);
-    navigate('/');
-  };
-
-  return (
-    <AuthFrame>
-      <form onSubmit={(event) => void submit(event)}>
-        <label className="block text-[12px] leading-4 font-medium text-muted" htmlFor="password">Password</label>
-        <input id="password" autoFocus type="password" className={`${inputClass} mt-1.5`} value={password} onChange={(event) => setPassword(event.target.value)} />
-        <label className="mt-4 block text-[12px] leading-4 font-medium text-muted" htmlFor="confirm">Confirm password</label>
-        <input id="confirm" type="password" className={`${inputClass} mt-1.5`} value={confirm} onChange={(event) => setConfirm(event.target.value)} />
-        {error ? <p className="mt-2 text-[12px] leading-4 text-danger">{error}</p> : null}
-        <Button type="submit" block className="mt-5">Create</Button>
-        <p className="mt-4 text-[12px] leading-4 text-muted">If this password is lost, the data on this laptop cannot be unlocked.</p>
-      </form>
-    </AuthFrame>
-  );
-}
-
 export function LoginPage() {
   const navigate = useNavigate();
   const ready = useAuth((s) => s.ready);

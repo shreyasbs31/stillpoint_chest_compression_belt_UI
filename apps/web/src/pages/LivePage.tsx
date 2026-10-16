@@ -3,7 +3,6 @@ import { useBlocker, useNavigate, useParams } from 'react-router-dom';
 import { db } from '@/data/db';
 import { formatClock } from '@/data/ids';
 import type { Patient } from '@/data/types';
-import { deviceConfig } from '@/device/device.config';
 import { useDevice } from '@/device/useDevice';
 import { StreamChart } from '@/components/charts/StreamChart';
 import { Button, Modal, StatePill } from '@/components/ui';
@@ -16,16 +15,12 @@ export function LivePage() {
   const status = useDevice((s) => s.status);
   const state = useDevice((s) => s.state);
   const ready = useDevice((s) => s.ready);
-  const restarted = useDevice((s) => s.restarted);
-  const confirmed = useDevice((s) => s.emptyConfirmed);
-  const setConfirmed = useDevice((s) => s.setEmptyConfirmed);
   const error = useDevice((s) => s.error);
   const connect = useDevice((s) => s.connect);
   const command = useDevice((s) => s.command);
   const recording = useDevice((s) => s.recording);
   const started = useDevice((s) => s.recordingStartedAt);
   const metrics = useDevice((s) => s.metrics);
-  const trace = useDevice((s) => s.trace);
   const pressureNow = useDevice((s) => s.pressureNow);
   const markers = useDevice((s) => s.markers);
   const chartWindow = useSettings((s) => s.chartWindow);
@@ -58,7 +53,7 @@ export function LivePage() {
   }
 
   const elapsed = recording && started ? (now - started) / 1000 : 0;
-  const canInflate = ready && !restarted && state !== 'INFLATE';
+  const canInflate = ready && state !== 'INFLATE';
   const canZero = ready && state === 'IDLE';
 
   return (
@@ -90,7 +85,7 @@ export function LivePage() {
         <section className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-surface" style={{ gridArea: 'wave' }}>
           <PanelTitle
             title="Breathing"
-            value={trace}
+            value={pressureNow}
             color="var(--wave)"
             extra={
               <div className="flex rounded-lg border border-border p-0.5">
@@ -102,7 +97,7 @@ export function LivePage() {
               </div>
             }
           />
-          <div className="relative min-h-0 flex-1">
+          <div className="relative min-h-[280px] flex-1">
             <StreamChart kind="breathing" windowSec={chartWindow} markers={markers} />
             {status !== 'connected' ? (
               <div className="absolute inset-0 grid place-items-center bg-surface/80 p-6">
@@ -111,11 +106,8 @@ export function LivePage() {
                     <p className="text-[14px] text-muted">Starting</p>
                   ) : (
                     <>
-                      <label className="flex items-start gap-3 text-[14px] leading-5">
-                        <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[var(--primary)]" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
-                        The bladder is empty and open to air
-                      </label>
-                      <Button className="mt-4" disabled={!confirmed} onClick={() => void connect()}>Connect</Button>
+                      <p className="text-[14px] leading-5 text-muted">Connect starts the controller. A saved zero is kept.</p>
+                      <Button className="mt-4" onClick={() => void connect()}>Connect</Button>
                       {error ? <p className="mt-3 text-[13px] leading-5 text-danger">{error}</p> : null}
                     </>
                   )}
@@ -127,7 +119,7 @@ export function LivePage() {
 
         <section className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-surface" style={{ gridArea: 'pressure' }}>
           <PanelTitle title="Belt pressure" value={pressureNow} color="var(--pressure)" />
-          <div className="min-h-0 flex-1">
+          <div className="relative min-h-[140px] flex-1">
             <StreamChart kind="pressure" windowSec={chartWindow} markers={markers} />
           </div>
         </section>
@@ -137,7 +129,7 @@ export function LivePage() {
             <Tile label="Breathing rate" value={metrics.status === 'ready' && metrics.rate != null ? metrics.rate.toFixed(0) : null} unit="br/min" accent="var(--wave)" waiting={metrics.status} numeric={metrics.rate} />
             <Tile label="Breath depth" value={metrics.status === 'ready' && metrics.depth != null ? metrics.depth.toFixed(2) : null} unit="rel." accent="var(--wave)" waiting={metrics.status} numeric={metrics.depth} />
             <Tile label="Regularity" value={metrics.status === 'ready' && metrics.regularity != null ? metrics.regularity.toFixed(0) : null} unit="%" accent="var(--wave)" waiting={metrics.status} numeric={metrics.regularity} />
-            <Tile label="Belt pressure" value={metrics.status !== 'waiting' && metrics.pressure != null ? metrics.pressure.toFixed(2) : null} unit="rel." accent="var(--pressure)" waiting={metrics.status === 'waiting' ? 'waiting' : 'ready'} numeric={metrics.pressure} />
+            <Tile label="Belt pressure" value={metrics.pressure != null ? formatRel(metrics.pressure) : null} unit="rel." accent="var(--pressure)" waiting="ready" empty="No data" numeric={metrics.pressure} />
           </div>
 
           <section className="rounded-xl border border-border bg-surface px-3 py-3">
@@ -147,16 +139,13 @@ export function LivePage() {
                 {state === 'HOLD' ? `Holding ${formatClock(metrics.holdS)}` : 'Not holding'}
               </p>
             </div>
-            <div className="mt-3 h-1 overflow-hidden rounded-full bg-surface-raised">
-              <div className="h-full bg-ok" style={{ width: `${state === 'HOLD' ? Math.min(100, (metrics.holdS / deviceConfig.holdAutoDeflateS) * 100) : 0}%` }} />
-            </div>
           </section>
 
           <section className="grid gap-2">
             <div className="grid grid-cols-3 gap-2">
               <Button size="live" variant="secondary" className="px-2 text-[13px]" disabled={!canInflate} onClick={() => void command('inflate')}>{state === 'HOLD' ? 'Top up' : 'Inflate'}</Button>
               <Button size="live" variant="secondary" className="px-2 text-[13px]" disabled={!ready} onClick={() => void command('stop')}>Stop pumps</Button>
-              <Button size="live" variant="secondary" className="px-1 text-[13px]" disabled={!canZero} title="Zero sensor works only in IDLE with an empty bladder" onClick={() => void command('zero')}>Zero sensor</Button>
+              <Button size="live" variant="secondary" className="px-1 text-[13px]" disabled={!canZero} title="Zero sensor works only in IDLE. Open the bladder to air first." onClick={() => void command('zero')}>Zero sensor</Button>
             </div>
             <Button size="live" variant="danger" block disabled={!ready} onClick={() => void command('deflate')}>Deflate</Button>
           </section>
@@ -183,6 +172,13 @@ export function LivePage() {
   );
 }
 
+function formatRel(value: number) {
+  const abs = Math.abs(value);
+  if (abs >= 1000) return value.toFixed(0);
+  if (abs >= 100) return value.toFixed(1);
+  return value.toFixed(2);
+}
+
 function PanelTitle({ title, value, color, extra }: { title: string; value: number | null; color: string; extra?: React.ReactNode }) {
   return (
     <header className="flex h-11 shrink-0 items-center gap-3 border-b border-border px-3">
@@ -191,7 +187,7 @@ function PanelTitle({ title, value, color, extra }: { title: string; value: numb
       <p className="ml-auto text-[20px] leading-6 font-semibold tabular" style={{ color }}>
         {value == null ? <span className="text-faint"> </span> : (
           <>
-            {value.toFixed(2)}
+            {formatRel(value)}
             <span className="ml-1 text-[12px] font-medium text-muted">rel.</span>
           </>
         )}
@@ -207,6 +203,7 @@ function Tile({
   accent,
   waiting,
   numeric,
+  empty,
 }: {
   label: string;
   value: string | null;
@@ -214,6 +211,7 @@ function Tile({
   accent: string;
   waiting: 'waiting' | 'detecting' | 'ready';
   numeric: number | null;
+  empty?: string;
 }) {
   const history = useSpark(waiting === 'ready' ? numeric : null);
   return (
@@ -221,9 +219,9 @@ function Tile({
       <p className="label">{label}</p>
       <div className="mt-1 flex h-[52px] items-end">
         {value == null ? (
-          <p className="pb-1 text-[14px] leading-5 text-muted">{waiting === 'detecting' ? 'Detecting...' : 'Waiting for hold'}</p>
+          <p className="pb-1 text-[14px] leading-5 text-muted">{empty ?? (waiting === 'detecting' ? 'Detecting...' : 'Waiting for hold')}</p>
         ) : (
-          <p className="text-[48px] leading-[52px] font-semibold tabular tracking-tight">{value}</p>
+          <p className={`font-semibold tabular tracking-tight ${value.length > 7 ? 'text-[28px] leading-[32px]' : 'text-[48px] leading-[52px]'}`}>{value}</p>
         )}
       </div>
       <div className="mt-1 flex h-7 items-center gap-2">

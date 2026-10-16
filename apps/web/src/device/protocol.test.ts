@@ -30,8 +30,14 @@ describe('parseLine', () => {
 
 describe('matchEvent', () => {
   it('raises a restart only after the first READY', () => {
-    expect(matchEvent('READY', false)).toBeNull();
-    expect(matchEvent('READY', true)?.key).toBe('restarted');
+    expect(matchEvent('READY. Commands: 1=inflate+hold, 2=deflate, 0=stop, t=set zero, ?=status', false)).toBeNull();
+    expect(matchEvent('READY. Commands: 1=inflate+hold', true)?.message).toContain('saved zero was kept');
+  });
+
+  it('warns when no zero is saved and when zero is refused', () => {
+    expect(matchEvent('NO ZERO SAVED - open bladder to air and send t', false)?.key).toBe('no-zero');
+    expect(matchEvent('REFUSED zero - only allowed in IDLE', true)?.key).toBe('zero-refused');
+    expect(matchEvent('zero failed - sensor not responding', true)?.key).toBe('zero-failed');
   });
 
   it('matches safety and refusal keywords without the full firmware sentence', () => {

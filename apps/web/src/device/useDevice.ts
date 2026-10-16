@@ -3,7 +3,7 @@ import { toast } from '@/app/toasts';
 import { db } from '@/data/db';
 import { createId } from '@/data/ids';
 import type { DeviceState, Marker, Sample } from '@/data/types';
-import { liveMetrics, processSeries, summarize, type LiveMetrics } from '@/processing/breathing';
+import { liveMetrics, processLive, processSeries, summarize, type LiveMetrics } from '@/processing/breathing';
 import { clearPoints, getPoints, pushPoint } from './buffer';
 import { commands, type CommandName } from './commands';
 import { deviceConfig } from './device.config';
@@ -77,8 +77,8 @@ let seenReady = false;
 let zeroArmed = false;
 let batch: Sample[] = [];
 let seq = 0;
-let lastBreathCount = 0;
-let holdSince = 0;
+let holdStartedAt = 0;
+let openedAt = 0;
 
 export const useDevice = create<DeviceStore>((set, get) => ({
   status: 'idle',
@@ -105,7 +105,9 @@ export const useDevice = create<DeviceStore>((set, get) => ({
   connect: async () => {
     set({ status: 'starting', error: null, ready: false });
     window.clearTimeout(readyTimer);
+    seenReady = false;
     try {
+      openedAt = Date.now();
       await openSerial((line) => get().ingest(line), () => onLinkLost());
       set({ port: portLabel(), status: 'starting' });
       readyTimer = window.setTimeout(() => {
@@ -130,7 +132,7 @@ export const useDevice = create<DeviceStore>((set, get) => ({
   command: async (name) => {
     const state = get();
     if (!state.ready) return;
-    if (name === 'inflate' && (state.restarted || state.state === 'INFLATE')) return;
+    if (name === 'inflate' && state.state === 'INFLATE') return;
     if (name === 'zero' && state.state !== 'IDLE') return;
     await writeSerial(commands[name]);
     if (name === 'zero') zeroArmed = true;
@@ -198,10 +200,12 @@ export const useDevice = create<DeviceStore>((set, get) => ({
       return;
     }
     if (parsed.type === 'fault') {
-      raise('critical', 'sensor', 'Pressure sensor not responding. The controller is deflating the belt.');
+      raise('critical', 'sensor', 'Pressure sensor not responding. The belt stays as it is.');
       return;
     }
     if (parsed.type === 'event') {
+      const savedZero = /(?:loaded saved zero|zero set and saved) = (-?\d+)/i.exec(parsed.text);
+      if (savedZero) set({ zeroOffset: savedZero[1] });
       const match = matchEvent(parsed.text, seenReady);
       if (/^ready\b/i.test(parsed.text)) {
         seenReady = true;
@@ -211,16 +215,19 @@ export const useDevice = create<DeviceStore>((set, get) => ({
       if (match?.level === 'info') toast(match.message);
       else if (match) {
         raise(match.level, match.key, match.message);
-        if (match.key === 'restarted') set({ restarted: true });
-        if (match.key === 'zero-refused') zeroArmed = false;
+        if (match.key === 'zero-refused' || match.key === 'zero-failed') zeroArmed = false;
       }
       return;
     }
 
     const t = Date.now();
+    if (!get().ready && get().status === 'starting' && t - openedAt >= deviceConfig.startupQuietMs) {
+      window.clearTimeout(readyTimer);
+      set({ ready: true, status: 'connected', error: null });
+    }
     const previous = get().state;
-    if (parsed.state === 'HOLD' && previous !== 'HOLD') holdSince = t;
-    if (parsed.state !== 'HOLD') holdSince = 0;
+    if (parsed.state === 'HOLD' && (previous !== 'HOLD' || !holdStartedAt)) holdStartedAt = t;
+    if (parsed.state !== 'HOLD') holdStartedAt = 0;
     if (zeroArmed && parsed.state === 'IDLE') {
       zeroArmed = false;
       set({ restarted: false });
@@ -247,6 +254,11 @@ function onLinkLost() {
   if (status === 'idle') return;
   useDevice.setState({ status: 'disconnected', ready: false });
   raise('critical', 'disconnected', 'Device disconnected. The belt may still be inflated. Reconnect and press Deflate, or release the belt by hand.');
+}
+
+function clearAlert(key: string) {
+  const alerts = useDevice.getState().alerts;
+  if (alerts.some((alert) => alert.key === key)) useDevice.setState({ alerts: alerts.filter((alert) => alert.key !== key) });
 }
 
 function raise(level: 'critical' | 'warning', key: string, message: string) {
@@ -278,15 +290,17 @@ export function startWatchers() {
     }
     const recent = points.filter((point) => Date.now() - point.t <= 10_000);
     useDevice.setState({ lineRateHz: recent.length / 10 });
-    if (state.state === 'HOLD' && holdSince) {
-      const processed = processSeries(points.map((point) => ({ t: point.t, pressureRaw: point.pressureRaw, state: point.state })));
-      if (processed.breaths.length > lastBreathCount) {
-        lastBreathCount = processed.breaths.length;
-        holdSince = Date.now();
-        useDevice.setState({ alerts: useDevice.getState().alerts.filter((alert) => alert.key !== 'no-breath') });
-      } else if (Date.now() - holdSince > deviceConfig.noBreathAlertS * 1000) {
+    if (state.state === 'HOLD' && holdStartedAt) {
+      const processed = processLive(points.map((point) => ({ t: point.t, pressureRaw: point.pressureRaw, state: point.state })));
+      const lastBreath = processed.breaths[processed.breaths.length - 1];
+      const since = Math.max(holdStartedAt + deviceConfig.baselineWarmupMs, lastBreath?.endT ?? 0);
+      if (Date.now() - since > deviceConfig.noBreathAlertS * 1000) {
         raise('warning', 'no-breath', 'No breaths detected for 15 s. Check the patient and the belt.');
+      } else {
+        clearAlert('no-breath');
       }
+    } else {
+      clearAlert('no-breath');
     }
   }, 500);
   metricTimer = window.setInterval(() => {
@@ -295,17 +309,13 @@ export function startWatchers() {
       useDevice.setState({ metrics: emptyMetrics, trace: null, pressureNow: null });
       return;
     }
-    const processed = processSeries(points.map((point) => ({ t: point.t, pressureRaw: point.pressureRaw, state: point.state })));
+    const processed = processLive(points.map((point) => ({ t: point.t, pressureRaw: point.pressureRaw, state: point.state })));
     const latest = processed.samples[processed.samples.length - 1];
-    let trace: number | null = null;
-    for (let i = processed.samples.length - 1; i >= 0; i--) {
-      if (processed.samples[i].breathing != null) {
-        trace = processed.samples[i].breathing ?? null;
-        break;
-      }
-    }
+    const trace = latest ? latest.wave : null;
+    const metrics = liveMetrics(processed.samples, processed.breaths, Date.now());
+    if (metrics.status !== 'waiting' && holdStartedAt) metrics.holdS = (Date.now() - holdStartedAt) / 1000;
     useDevice.setState({
-      metrics: liveMetrics(processed.samples, processed.breaths, Date.now()),
+      metrics,
       trace,
       pressureNow: latest?.pressureSmooth ?? null,
     });

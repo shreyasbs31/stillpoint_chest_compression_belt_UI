@@ -55,16 +55,30 @@ export function matchEvent(text: string, alreadyReady: boolean): AlertMatch {
       return {
         level: 'critical',
         key: 'restarted',
-        message: 'The controller restarted and re-zeroed. Release the belt by hand, confirm it is empty, then press Zero sensor.',
+        message: 'The controller restarted. The saved zero was kept. The belt may still be inflated. Press Deflate, or release the belt by hand.',
       };
     }
     return null;
+  }
+  if (lower.includes('no zero saved')) {
+    return {
+      level: 'warning',
+      key: 'no-zero',
+      message: 'No zero is saved. Open the bladder to air, then press Zero sensor.',
+    };
+  }
+  if (lower.includes('zero failed')) {
+    return {
+      level: 'warning',
+      key: 'zero-failed',
+      message: 'Zero sensor failed. The sensor is not responding.',
+    };
   }
   if (lower.includes('safety') && lower.includes('sensor')) {
     return {
       level: 'critical',
       key: 'sensor',
-      message: 'Pressure sensor not responding. The controller is deflating the belt.',
+      message: 'Pressure sensor not responding. The belt stays as it is.',
     };
   }
   if (lower.includes('safety') && lower.includes('over-pressure')) {
@@ -93,6 +107,9 @@ export function matchEvent(text: string, alreadyReady: boolean): AlertMatch {
   }
   if (lower.includes('refused') && (lower.includes('tare') || lower.includes('zero'))) {
     return { level: 'info', key: 'zero-refused', message: 'Zero sensor works only in IDLE with an empty bladder.' };
+  }
+  if (lower.includes('zero set and saved')) {
+    return { level: 'info', key: 'zero-saved', message: 'Sensor zeroed and saved on the controller.' };
   }
   return null;
 }

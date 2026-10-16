@@ -3,7 +3,7 @@ import { Navigate, Outlet, createBrowserRouter, RouterProvider } from 'react-rou
 import { useAuth } from '@/auth/auth';
 import { Shell } from '@/components/shell';
 import { closeOpenSessions } from '@/device/useDevice';
-import { LoginPage, SetupPage } from '@/pages/AuthPages';
+import { LoginPage } from '@/pages/AuthPages';
 import { LivePage } from '@/pages/LivePage';
 import { PatientPage } from '@/pages/PatientPage';
 import { PatientsPage } from '@/pages/PatientsPage';
@@ -29,7 +29,7 @@ function Gate() {
 }
 
 const router = createBrowserRouter([
-  { path: '/setup', element: <SetupPage /> },
+  { path: '/setup', element: <Navigate to="/login" replace /> },
   { path: '/login', element: <LoginPage /> },
   {
     element: <Gate />,

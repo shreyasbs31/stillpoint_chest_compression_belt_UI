@@ -46,8 +46,9 @@ export function ReviewDetail({
       chart.setData([[start, end], [null, null], [null, null]]);
       return;
     }
-    chart.setData([xs, breath, pressure]);
+    reviewOrigin.current = samples[0] ? samples[0].t / 1000 : 0;
     drawMarkerHook.current = markers;
+    chart.setData([xs, breath, pressure]);
     chart.redraw();
   }, [samples, markers, start, windowS]);
 
@@ -55,6 +56,25 @@ export function ReviewDetail({
 }
 
 const drawMarkerHook = { current: [] as Marker[] };
+const reviewOrigin = { current: 0 };
+
+function decimals(incr: number) {
+  return Math.min(3, Math.max(0, -Math.floor(Math.log10(incr || 1))));
+}
+
+function pad(minSpan: number): uPlot.Range.Function {
+  return (_u, min, max) => {
+    if (min == null || max == null || !Number.isFinite(min) || !Number.isFinite(max)) return [-1, 1];
+    const span = Math.max(minSpan, max - min);
+    const mid = (min + max) / 2;
+    return [mid - span * 0.6, mid + span * 0.6];
+  };
+}
+
+function formatElapsed(seconds: number) {
+  const total = Math.max(0, Math.round(seconds));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+}
 
 function options(el: HTMLDivElement, label: string, _dual: boolean): uPlot.Options {
   return {
@@ -64,7 +84,7 @@ function options(el: HTMLDivElement, label: string, _dual: boolean): uPlot.Optio
     cursor: { show: false },
     legend: { show: false },
     padding: [16, 8, 0, 0],
-    scales: { x: { time: false } },
+    scales: { x: { time: false }, y: { range: pad(0.1) }, p: { range: pad(0.5) } },
     axes: [
       {
         stroke: token('--text-muted'),
@@ -72,6 +92,7 @@ function options(el: HTMLDivElement, label: string, _dual: boolean): uPlot.Optio
         ticks: { stroke: token('--border'), size: 4 },
         font: '500 11px Inter',
         size: 26,
+        values: (u, vals) => vals.map((value) => formatElapsed(value - reviewOrigin.current)),
       },
       {
         stroke: token('--text-muted'),
@@ -82,13 +103,26 @@ function options(el: HTMLDivElement, label: string, _dual: boolean): uPlot.Optio
         label,
         labelFont: '500 11px Inter',
         labelSize: 16,
-        values: (_u, vals) => vals.map((value) => value.toFixed(1)),
+        values: (_u, vals, _axis, _space, incr) => vals.map((value) => value.toFixed(decimals(incr))),
+      },
+      {
+        scale: 'p',
+        side: 1,
+        stroke: token('--pressure'),
+        grid: { show: false },
+        ticks: { stroke: token('--border'), size: 4 },
+        font: '500 11px Inter',
+        size: 52,
+        label: 'Belt pressure (rel.)',
+        labelFont: '500 11px Inter',
+        labelSize: 16,
+        values: (_u, vals, _axis, _space, incr) => vals.map((value) => value.toFixed(decimals(incr))),
       },
     ],
     series: [
       {},
-      { stroke: token('--wave'), width: 2, fill: token('--wave-fill'), scale: 'y' },
-      { stroke: token('--pressure'), width: 1.5, scale: 'y' },
+      { stroke: token('--wave'), width: 2, scale: 'y' },
+      { stroke: token('--pressure'), width: 1, scale: 'p', alpha: 0.7 },
     ],
     hooks: {
       draw: [
